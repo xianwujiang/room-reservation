@@ -2,134 +2,117 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>会议室预约系统（简洁单文件版）</title>
+    <title>物理与力学学院会议室预约系统（美观界面版）</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f9f9f9; }
-        h2 { text-align: center; }
-        .container { max-width: 750px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
-        input, select, button { margin: 5px; padding: 6px 10px; font-size: 14px; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; background: #f0f2f5; }
+        h2 { text-align: center; margin: 20px 0; color: #333; }
+        .container { display: flex; flex-wrap: wrap; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .card { background: #fff; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 10px; padding: 20px; flex: 1; min-width: 280px; }
+        input, select, button, textarea { margin: 5px 0; padding: 8px 12px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
+        button { background-color: #4CAF50; color: white; border: none; cursor: pointer; transition: 0.3s; }
+        button:hover { background-color: #45a049; }
         table { border-collapse: collapse; width: 100%; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
         th { background-color: #4CAF50; color: white; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        tr.pending { background-color: #fff4e5; }
         .admin-controls button { margin: 2px; }
+        .toast { visibility: hidden; min-width: 200px; margin-left: -100px; background-color: #333; color: #fff;
+                 text-align: center; border-radius: 4px; padding: 10px; position: fixed; z-index: 1;
+                 left: 50%; bottom: 30px; font-size: 14px; }
+        .toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
     </style>
 </head>
 <body>
-<div class="container">
     <h2>会议室预约系统</h2>
-    <div>
-        <input type="text" id="name" placeholder="姓名">
-        <select id="room">
-            <option value="A">会议室A</option>
-            <option value="B">会议室B</option>
-            <option value="C">会议室C</option>
-        </select>
-        <input type="date" id="date">
-        <input type="time" id="time">
-        <select id="repeat">
-            <option value="none">不重复</option>
-            <option value="weekly">每周</option>
-            <option value="monthly">每月</option>
-        </select>
-        <button onclick="addBooking()">预约</button>
+    <div class="container">
+        <div class="card">
+            <h3>新建预约</h3>
+            <input type="text" id="name" placeholder="姓名">
+            <select id="room">
+                <option value="304P">物理楼304</option>
+                <option value="307P">物理楼307</option>
+                <option value="304C">学院楼304</option>
+            </select>
+            <input type="date" id="date">
+            <input type="time" id="time" placeholder="开始时间">
+            <input type="time" id="endTime" placeholder="结束时间">
+            <select id="repeat">
+                <option value="none">不重复</option>
+                <option value="weekly">每周</option>
+                <option value="monthly">每月</option>
+            </select>
+            <button onclick="addBooking()">创建预约</button>
+        </div>
+        <div class="card">
+            <h3>管理员登录</h3>
+            <input type="email" id="adminEmail" placeholder="管理员邮箱">
+            <input type="password" id="adminPass" placeholder="管理员密码">
+            <button onclick="toggleAdmin()">切换管理员模式</button>
+        </div>
+        <div class="card" style="flex-basis: 100%;">
+            <h3>预约列表</h3>
+            <table id="bookingsTable">
+                <thead>
+                    <tr><th>姓名</th><th>会议室</th><th>日期</th><th>开始时间</th><th>结束时间</th><th>状态</th><th>操作</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
-    <div style="margin-top: 10px;">
-        <input type="email" id="adminEmail" placeholder="管理员邮箱">
-        <input type="password" id="adminPass" placeholder="管理员密码">
-        <button onclick="toggleAdmin()">切换管理员模式</button>
-    </div>
-    <table id="bookingsTable">
-        <thead>
-            <tr><th>姓名</th><th>会议室</th><th>日期</th><th>时间</th><th>操作</th></tr>
-        </thead>
-        <tbody></tbody>
-    </table>
-</div>
 
+<div id="toast" class="toast"></div>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script>
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "SENDER_ID",
-    appId: "APP_ID"
+    apiKey: "AIzaSyCQKfRtzWVRJE3ps5ZFLk4Y0TZFxPqAVjo",
+    authDomain: "room-reservation-system-df833.firebaseapp.com",
+    databaseURL: "https://room-reservation-system-df833-default-rtdb.firebaseio.com",
+    projectId: "room-reservation-system-df833",
+    storageBucket: "room-reservation-system-df833.firebasestorage.app",
+    messagingSenderId: "904158542811",
+    appId: "1:904158542811:web:9dc50ec10b1ffb887445fe",
+    measurementId: "G-K8CB2GGJKD"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
-
 let isAdmin = false;
-const adminEmails = ['xwjiang@whut.edu.cn'];
+
+function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast show';
+    setTimeout(() => { toast.className = 'toast'; }, 3000);
+}
 
 function addBooking() {
     const name = document.getElementById('name').value;
     const room = document.getElementById('room').value;
     const date = document.getElementById('date').value;
-    const time = document.getElementById('time').value;
+    const startTime = document.getElementById('time').value;
+    const endTime = document.getElementById('endTime').value;
     const repeat = document.getElementById('repeat').value;
-    if (!name || !date || !time || !room) return alert('请填写完整信息');
+    if (!name || !date || !startTime || !endTime || !room) return showToast('请填写完整信息');
 
     const bookingId = db.ref('bookings').push().key;
-    const bookingData = { name, room, date, time, repeat };
+    const status = (room === '304C' && !isAdmin) ? '待审核' : '已确认';
+    const bookingData = { name, room, date, time: startTime, endTime, repeat, status };
     db.ref('bookings/' + bookingId).set(bookingData);
-
-    if (repeat !== 'none') scheduleRepeatingBookings(bookingData, repeat);
+    renderBookingRow(bookingId, bookingData);
+    showToast('预约提交成功' + (status === '待审核' ? '，等待管理员审核' : ''));
 }
 
-function scheduleRepeatingBookings(data, repeatType) {
-    let current = new Date(data.date);
-    for (let i = 1; i <= 12; i++) {
-        let newDate = new Date(current);
-        if (repeatType === 'weekly') newDate.setDate(newDate.getDate() + 7 * i);
-        if (repeatType === 'monthly') newDate.setMonth(newDate.getMonth() + i);
-        const id = db.ref('bookings').push().key;
-        db.ref('bookings/' + id).set({ name: data.name, room: data.room, date: newDate.toISOString().split('T')[0], time: data.time, repeat: repeatType });
-    }
-}
-
-function deleteBooking(id) {
-    if (!isAdmin) return alert('只有管理员可以删除预约');
-    db.ref('bookings/' + id).remove();
-}
-
-function editBooking(id) {
-    if (!isAdmin) return alert('只有管理员可以修改预约');
-    const newName = prompt('请输入新的姓名');
-    const newRoom = prompt('请输入新的会议室');
-    const newDate = prompt('请输入新的日期 (YYYY-MM-DD)');
-    const newTime = prompt('请输入新的时间 (HH:MM)');
-    if (newName && newRoom && newDate && newTime) db.ref('bookings/' + id).update({ name: newName, room: newRoom, date: newDate, time: newTime });
-}
-
-function toggleAdmin() {
-    const email = document.getElementById('adminEmail').value;
-    const pass = document.getElementById('adminPass').value;
-    if (pass === 'admin123' && adminEmails.includes(email)) {
-        isAdmin = !isAdmin;
-        alert(isAdmin ? '已进入管理员模式' : '已退出管理员模式');
-    } else {
-        alert('管理员认证失败');
-    }
-}
-
-function renderTable(snapshot) {
+function renderBookingRow(id, booking) {
     const tbody = document.querySelector('#bookingsTable tbody');
-    tbody.innerHTML = '';
-    snapshot.forEach(child => {
-        const booking = child.val();
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${booking.name}</td><td>${booking.room}</td><td>${booking.date}</td><td>${booking.time}</td>` +
-                       `<td>${isAdmin ? `<div class='admin-controls'><button onclick=\"editBooking('${child.key}')\">修改</button>` +
-                       ` <button onclick=\"deleteBooking('${child.key}')\">删除</button></div>` : ''}</td>`;
-        tbody.appendChild(tr);
-    });
+    const tr = document.createElement('tr');
+    tr.id = id;
+    tr.className = booking.status === '待审核' ? 'pending' : '';
+    tr.innerHTML = `<td>${booking.name}</td><td>${booking.room}</td><td>${booking.date}</td><td>${booking.time}</td><td>${booking.endTime}</td><td>${booking.status}</td><td>${isAdmin ? '<button onclick=\"editBooking(\''+id+'\')\">编辑</button> <button onclick=\"deleteBooking(\''+id+'\')\">删除</button>' : ''}</td>`;
+    tbody.appendChild(tr);
 }
-
-db.ref('bookings').on('value', renderTable);
 </script>
 </body>
 </html>

@@ -1,118 +1,177 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <title>物理与力学学院会议室预约系统（美观界面版）</title>
-    <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; background: #f0f2f5; }
-        h2 { text-align: center; margin: 20px 0; color: #333; }
-        .container { display: flex; flex-wrap: wrap; max-width: 1200px; margin: 0 auto; padding: 20px; }
-        .card { background: #fff; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 10px; padding: 20px; flex: 1; min-width: 280px; }
-        input, select, button, textarea { margin: 5px 0; padding: 8px 12px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
-        button { background-color: #4CAF50; color: white; border: none; cursor: pointer; transition: 0.3s; }
-        button:hover { background-color: #45a049; }
-        table { border-collapse: collapse; width: 100%; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-        th { background-color: #4CAF50; color: white; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        tr.pending { background-color: #fff4e5; }
-        .admin-controls button { margin: 2px; }
-        .toast { visibility: hidden; min-width: 200px; margin-left: -100px; background-color: #333; color: #fff;
-                 text-align: center; border-radius: 4px; padding: 10px; position: fixed; z-index: 1;
-                 left: 50%; bottom: 30px; font-size: 14px; }
-        .toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
-        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
-        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
-    </style>
+  <meta charset="UTF-8">
+  <title>会议室预约系统</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 20px;
+      background: #f4f6f9; color: #333;
+    }
+    h1 { text-align: center; margin-bottom: 20px; }
+    .container {
+      max-width: 800px; margin: auto;
+      background: #fff; padding: 20px;
+      border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    input, select, button {
+      margin-top: 6px; padding: 8px;
+      border: 1px solid #ccc; border-radius: 6px; width: 100%;
+    }
+    button {
+      background: #007BFF; color: white; cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover { background: #0056b3; }
+    .list { margin-top: 20px; }
+    .item {
+      background: #fafafa; padding: 12px;
+      border: 1px solid #ddd; border-radius: 8px; margin-top: 10px;
+    }
+    .pending { color: orange; }
+    .approved { color: green; }
+    .admin-panel { margin-top: 30px; padding: 15px; border: 2px dashed #007BFF; border-radius: 10px; }
+  </style>
 </head>
 <body>
-    <h2>会议室预约系统</h2>
-    <div class="container">
-        <div class="card">
-            <h3>新建预约</h3>
-            <input type="text" id="name" placeholder="姓名">
-            <select id="room">
-                <option value="304P">物理楼304</option>
-                <option value="307P">物理楼307</option>
-                <option value="304C">学院楼304</option>
-            </select>
-            <input type="date" id="date">
-            <input type="time" id="time" placeholder="开始时间">
-            <input type="time" id="endTime" placeholder="结束时间">
-            <select id="repeat">
-                <option value="none">不重复</option>
-                <option value="weekly">每周</option>
-                <option value="monthly">每月</option>
-            </select>
-            <button onclick="addBooking()">创建预约</button>
-        </div>
-        <div class="card">
-            <h3>管理员登录</h3>
-            <input type="email" id="adminEmail" placeholder="管理员邮箱">
-            <input type="password" id="adminPass" placeholder="管理员密码">
-            <button onclick="toggleAdmin()">切换管理员模式</button>
-        </div>
-        <div class="card" style="flex-basis: 100%;">
-            <h3>预约列表</h3>
-            <table id="bookingsTable">
-                <thead>
-                    <tr><th>姓名</th><th>会议室</th><th>日期</th><th>开始时间</th><th>结束时间</th><th>状态</th><th>操作</th></tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
+  <div class="container">
+    <h1>会议室预约系统</h1>
+
+    <div id="user-panel">
+      <label>姓名：</label>
+      <input id="name" type="text">
+
+      <label>会议室：</label>
+      <select id="room">
+        <option value="物理楼304">物理楼304</option>
+        <option value="物理楼307">物理楼307</option>
+        <option value="学院楼304">学院楼304（需管理员审核）</option>
+      </select>
+
+      <label>开始时间：</label>
+      <input id="startTime" type="datetime-local">
+
+      <label>结束时间：</label>
+      <input id="endTime" type="datetime-local">
+
+      <button onclick="bookRoom()">提交预约</button>
     </div>
 
-<div id="toast" class="toast"></div>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script>
-const firebaseConfig = {
-    apiKey: "AIzaSyCQKfRtzWVRJE3ps5ZFLk4Y0TZFxPqAVjo",
-    authDomain: "room-reservation-system-df833.firebaseapp.com",
-    databaseURL: "https://room-reservation-system-df833-default-rtdb.firebaseio.com",
-    projectId: "room-reservation-system-df833",
-    storageBucket: "room-reservation-system-df833.firebasestorage.app",
-    messagingSenderId: "904158542811",
-    appId: "1:904158542811:web:9dc50ec10b1ffb887445fe",
-    measurementId: "G-K8CB2GGJKD"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-let isAdmin = false;
+    <div class="list">
+      <h3>预约记录</h3>
+      <div id="bookings"></div>
+    </div>
 
-function showToast(msg) {
-    const toast = document.getElementById('toast');
-    toast.textContent = msg;
-    toast.className = 'toast show';
-    setTimeout(() => { toast.className = 'toast'; }, 3000);
-}
+    <div class="admin-login">
+      <h3>管理员登录</h3>
+      <label>邮箱：</label>
+      <input id="adminEmail" type="email" placeholder="输入邮箱">
+      <label>密码：</label>
+      <input id="adminPassword" type="password" placeholder="输入密码">
+      <button onclick="toggleAdmin()">切换管理员模式</button>
+    </div>
 
-function addBooking() {
-    const name = document.getElementById('name').value;
-    const room = document.getElementById('room').value;
-    const date = document.getElementById('date').value;
-    const startTime = document.getElementById('time').value;
-    const endTime = document.getElementById('endTime').value;
-    const repeat = document.getElementById('repeat').value;
-    if (!name || !date || !startTime || !endTime || !room) return showToast('请填写完整信息');
+    <div id="admin-panel" class="admin-panel" style="display:none;">
+      <h3>管理员待审核预约</h3>
+      <div id="pending-list"></div>
+    </div>
+  </div>
 
-    const bookingId = db.ref('bookings').push().key;
-    const status = (room === '304C' && !isAdmin) ? '待审核' : '已确认';
-    const bookingData = { name, room, date, time: startTime, endTime, repeat, status };
-    db.ref('bookings/' + bookingId).set(bookingData);
-    renderBookingRow(bookingId, bookingData);
-    showToast('预约提交成功' + (status === '待审核' ? '，等待管理员审核' : ''));
-}
+  <script>
+    // TODO: 替换为你的 firebaseConfig
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-function renderBookingRow(id, booking) {
-    const tbody = document.querySelector('#bookingsTable tbody');
-    const tr = document.createElement('tr');
-    tr.id = id;
-    tr.className = booking.status === '待审核' ? 'pending' : '';
-    tr.innerHTML = `<td>${booking.name}</td><td>${booking.room}</td><td>${booking.date}</td><td>${booking.time}</td><td>${booking.endTime}</td><td>${booking.status}</td><td>${isAdmin ? '<button onclick=\"editBooking(\''+id+'\')\">编辑</button> <button onclick=\"deleteBooking(\''+id+'\')\">删除</button>' : ''}</td>`;
-    tbody.appendChild(tr);
-}
-</script>
+    let isAdmin = false;
+
+    function bookRoom() {
+      const name = document.getElementById("name").value;
+      const room = document.getElementById("room").value;
+      const start = document.getElementById("startTime").value;
+      const end = document.getElementById("endTime").value;
+
+      if (!name || !start || !end) {
+        alert("请填写完整信息");
+        return;
+      }
+
+      const status = (room === "学院楼304") ? "待审核" : "已预约成功";
+
+      db.collection("bookings").add({
+        name, room, start, end, status,
+        timestamp: new Date()
+      });
+    }
+
+    function renderBookings(bookings) {
+      const list = document.getElementById("bookings");
+      list.innerHTML = "";
+      bookings.forEach(doc => {
+        const data = doc.data();
+        const div = document.createElement("div");
+        div.className = "item";
+        div.innerHTML = `
+          <b>${data.name}</b> 预约 <b>${data.room}</b><br>
+          ${data.start} - ${data.end}<br>
+          状态: <span class="${data.status === "待审核" ? "pending" : "approved"}">${data.status}</span>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function renderPending(bookings) {
+      const list = document.getElementById("pending-list");
+      list.innerHTML = "";
+      bookings.forEach(doc => {
+        const data = doc.data();
+        if (data.status === "待审核") {
+          const div = document.createElement("div");
+          div.className = "item";
+          div.innerHTML = `
+            <b>${data.name}</b> 请求预约 <b>${data.room}</b><br>
+            ${data.start} - ${data.end}<br>
+            <button onclick="approveBooking('${doc.id}')">批准</button>
+            <button onclick="rejectBooking('${doc.id}')">拒绝</button>
+          `;
+          list.appendChild(div);
+        }
+      });
+    }
+
+    function approveBooking(id) {
+      db.collection("bookings").doc(id).update({ status: "已预约成功" });
+    }
+    function rejectBooking(id) {
+      db.collection("bookings").doc(id).delete();
+    }
+
+    function toggleAdmin() {
+      const email = document.getElementById("adminEmail").value;
+      const password = document.getElementById("adminPassword").value;
+      if (email === "xwjiang@whut.edu.cn" && password === "admin123") {
+        isAdmin = !isAdmin;
+        document.getElementById("admin-panel").style.display = isAdmin ? "block" : "none";
+        alert(isAdmin ? "已进入管理员模式" : "已退出管理员模式");
+      } else {
+        alert("管理员账号或密码错误");
+      }
+    }
+
+    // 监听数据库变化
+    db.collection("bookings").orderBy("timestamp", "desc").onSnapshot(snapshot => {
+      const docs = snapshot.docs;
+      renderBookings(docs);
+      if (isAdmin) renderPending(docs);
+    });
+  </script>
 </body>
 </html>

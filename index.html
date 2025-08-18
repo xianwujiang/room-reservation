@@ -1,162 +1,321 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>会议预约系统</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <title>物理与力学学院会议室预约系统（美观界面版）</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        :root{
+          --brand:#4CAF50;--brand-dark:#3c9442;--danger:#e5534b;--muted:#6b7280;--bg:#f0f2f5;--card:#fff
+        }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; background: var(--bg); }
+        h2 { text-align: center; margin: 20px 0; color: #333; }
+        .container { display: flex; flex-wrap: wrap; max-width: 1200px; margin: 0 auto; padding: 20px; gap: 12px; }
+        .card { background: var(--card); border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); padding: 20px; flex: 1; min-width: 280px; }
+        .card h3{margin:0 0 10px 0}
+        input, select, button, textarea { margin: 6px 0; padding: 10px 12px; font-size: 14px; border-radius: 8px; border: 1px solid #ddd; width: 100%; box-sizing: border-box; }
+        input:focus, select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(76,175,80,.15); }
+        button { background-color: var(--brand); color: white; border: none; cursor: pointer; transition: 0.2s; font-weight: 600; }
+        button:hover { background-color: var(--brand-dark); }
+        .btn-plain{background:#eef2f7;color:#111}
+        .btn-danger{background: var(--danger);} .btn-danger:hover{filter:brightness(.95)}
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        th, td { border: 1px solid #eee; padding: 10px; text-align: center; font-size: 14px; }
+        th { background-color: var(--brand); color: white; position: sticky; top:0; z-index:1 }
+        tr:nth-child(even) { background-color: #fafafa; }
+        tr.pending { background-color: #fff4e5; }
+        .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px}
+        .tag-ok{background:#e7f7ec;color:#1e7d3b;border:1px solid #b9e5c7}
+        .tag-pending{background:#fff5e6;color:#a7630b;border:1px solid #ffd59e}
+        .admin-controls button { margin: 0 4px 6px 0; }
+        .toast { visibility: hidden; min-width: 220px; background-color: #111; color: #fff; text-align: center; border-radius: 6px; padding: 10px 12px; position: fixed; z-index: 20; left: 50%; transform: translateX(-50%); bottom: 28px; font-size: 14px; }
+        .toast.show { visibility: visible; animation: fadein 0.25s, fadeout 0.25s 2.6s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 28px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 28px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+
+        /* Modal */
+        .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:30;align-items:center;justify-content:center}
+        .modal{width: 420px; max-width: calc(100% - 28px); background:#fff;border-radius:12px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+        .modal h4{margin:4px 0 8px 0}
+        .modal .row{display:flex;gap:8px}
+        .modal .row>div{flex:1}
+        .modal .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-6">
-  <div class="max-w-4xl mx-auto bg-white p-6 rounded-2xl shadow-md">
-    <h1 class="text-2xl font-bold mb-4 text-center">会议预约系统</h1>
-    
-    <!-- 管理员登录 -->
-    <div class="mb-4">
-      <input id="adminEmail" type="email" placeholder="管理员邮箱" class="border p-2 rounded w-full mb-2">
-      <input id="adminPassword" type="password" placeholder="管理员密码" class="border p-2 rounded w-full mb-2">
-      <button id="adminToggle" class="bg-blue-500 text-white px-4 py-2 rounded">切换管理员模式</button>
+<body>
+    <h2>会议室预约系统</h2>
+    <div class="container">
+        <div class="card">
+            <h3>新建预约</h3>
+            <input type="text" id="name" placeholder="姓名">
+            <select id="room">
+                <option value="304P">物理楼304</option>
+                <option value="307P">物理楼307</option>
+                <option value="304C">学院楼304（需管理员审核）</option>
+            </select>
+            <input type="date" id="date">
+            <div class="row">
+              <div>
+                <label style="font-size:12px;color:var(--muted)">开始时间</label>
+                <input type="time" id="time" placeholder="开始时间">
+              </div>
+              <div>
+                <label style="font-size:12px;color:var(--muted)">结束时间</label>
+                <input type="time" id="endTime" placeholder="结束时间">
+              </div>
+            </div>
+            <button id="createBtn">创建预约</button>
+        </div>
+        <div class="card">
+            <h3>管理员登录</h3>
+            <input type="email" id="adminEmail" placeholder="管理员邮箱">
+            <input type="password" id="adminPass" placeholder="管理员密码">
+            <button id="toggleAdminBtn">切换管理员模式</button>
+            <div id="adminStatus" style="margin-top:6px;color:var(--muted);font-size:13px">当前身份：普通用户</div>
+        </div>
+        <div class="card" style="flex-basis: 100%;">
+            <h3>预约列表</h3>
+            <table id="bookingsTable">
+                <thead>
+                    <tr><th>姓名</th><th>会议室</th><th>日期</th><th>开始时间</th><th>结束时间</th><th>状态</th><th>操作</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
 
-    <!-- 普通用户预约 -->
-    <div id="userSection">
-      <h2 class="text-xl font-semibold mb-2">创建预约</h2>
-      <input id="userName" type="text" placeholder="您的姓名" class="border p-2 rounded w-full mb-2">
-      <input id="contact" type="text" placeholder="联系方式（手机号）" class="border p-2 rounded w-full mb-2">
-      <textarea id="meetingTopic" placeholder="会议主题" class="border p-2 rounded w-full mb-2"></textarea>
-      
-      <div class="flex gap-2 mb-2">
-        <select id="year" class="border p-2 rounded"></select>
-        <select id="month" class="border p-2 rounded"></select>
-        <select id="day" class="border p-2 rounded"></select>
-        <select id="hour" class="border p-2 rounded"></select>
-        <select id="minute" class="border p-2 rounded"></select>
-      </div>
-      <button id="createBtn" class="bg-green-500 text-white px-4 py-2 rounded">创建预约</button>
-    </div>
-
-    <!-- 管理员界面 -->
-    <div id="adminSection" class="hidden mt-6">
-      <h2 class="text-xl font-semibold mb-2">管理员功能</h2>
-      <p class="mb-2 text-gray-700">浏览次数：<span id="visitCount">0</span></p>
-      <h3 class="text-lg font-semibold">预约列表</h3>
-      <ul id="adminList" class="space-y-2 mt-2"></ul>
-    </div>
-
-    <!-- 普通预约列表 -->
-    <div id="reservationSection" class="mt-6">
-      <h2 class="text-xl font-semibold mb-2">预约列表</h2>
-      <ul id="reservationList" class="space-y-2"></ul>
-    </div>
-  </div>
-
-  <script>
-    const adminEmailInput = document.getElementById("adminEmail");
-    const adminPasswordInput = document.getElementById("adminPassword");
-    const adminToggle = document.getElementById("adminToggle");
-    const adminSection = document.getElementById("adminSection");
-    const userSection = document.getElementById("userSection");
-    const reservationList = document.getElementById("reservationList");
-    const adminList = document.getElementById("adminList");
-    const visitCountEl = document.getElementById("visitCount");
-
-    const yearSel = document.getElementById("year");
-    const monthSel = document.getElementById("month");
-    const daySel = document.getElementById("day");
-    const hourSel = document.getElementById("hour");
-    const minuteSel = document.getElementById("minute");
-
-    // 初始化本地存储数据
-    let reservations = JSON.parse(localStorage.getItem("reservations")) || [];
-    let visitCount = parseInt(localStorage.getItem("visitCount")) || 0;
-
-    // 访问计数
-    visitCount++;
-    localStorage.setItem("visitCount", visitCount);
-    visitCountEl.textContent = visitCount;
-
-    // 填充年份、月份、日期、时间
-    const now = new Date();
-    for (let y = now.getFullYear(); y <= now.getFullYear() + 1; y++) {
-      yearSel.innerHTML += `<option value="${y}">${y}</option>`;
-    }
-    for (let m = 1; m <= 12; m++) {
-      monthSel.innerHTML += `<option value="${m}">${m}</option>`;
-    }
-    for (let d = 1; d <= 31; d++) {
-      daySel.innerHTML += `<option value="${d}">${d}</option>`;
-    }
-    for (let h = 0; h < 24; h++) {
-      hourSel.innerHTML += `<option value="${h}">${h}</option>`;
-    }
-    for (let min = 0; min < 60; min += 5) {
-      minuteSel.innerHTML += `<option value="${min}">${min}</option>`;
-    }
-
-    // 渲染列表
-    function renderLists() {
-      reservationList.innerHTML = "";
-      adminList.innerHTML = "";
-
-      reservations.forEach((r, idx) => {
-        const liUser = document.createElement("li");
-        liUser.className = "border p-2 rounded";
-        liUser.textContent = `${r.name} (${r.contact}) - ${r.topic} - ${r.time}`;
-        reservationList.appendChild(liUser);
-
-        const liAdmin = document.createElement("li");
-        liAdmin.className = "border p-2 rounded flex justify-between items-center";
-        liAdmin.innerHTML = `
-          <span>${r.name} (${r.contact}) - ${r.topic} - ${r.time}</span>
+    <!-- 编辑时间 Modal -->
+    <div id="editBackdrop" class="modal-backdrop">
+      <div class="modal">
+        <h4>调整预约时间</h4>
+        <div class="row">
           <div>
-            <button onclick="deleteReservation(${idx})" class="bg-red-500 text-white px-2 py-1 rounded">删除</button>
+            <label style="font-size:12px;color:var(--muted)">日期</label>
+            <input type="date" id="editDate">
           </div>
-        `;
-        adminList.appendChild(liAdmin);
-      });
+          <div></div>
+        </div>
+        <div class="row">
+          <div>
+            <label style="font-size:12px;color:var(--muted)">开始时间</label>
+            <input type="time" id="editTime">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--muted)">结束时间</label>
+            <input type="time" id="editEndTime">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn-plain" onclick="closeModal()">取消</button>
+          <button onclick="saveEdit()">保存</button>
+        </div>
+      </div>
+    </div>
+
+<div id="toast" class="toast"></div>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyCQKfRtzWVRJE3ps5ZFLk4Y0TZFxPqAVjo",
+    authDomain: "room-reservation-system-df833.firebaseapp.com",
+    databaseURL: "https://room-reservation-system-df833-default-rtdb.firebaseio.com",
+    projectId: "room-reservation-system-df833",
+    storageBucket: "room-reservation-system-df833.firebasestorage.app",
+    messagingSenderId: "904158542811",
+    appId: "1:904158542811:web:9dc50ec10b1ffb887445fe",
+    measurementId: "G-K8CB2GGJKD"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// —— 全局状态 ——
+let isAdmin = false;
+let currentEditId = null; // 正在编辑的 bookingId
+const ROOM_LABELS = { '304P':'物理楼304', '307P':'物理楼307', '304C':'学院楼304' };
+
+// —— 工具函数 ——
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg; toast.className = 'toast show';
+  setTimeout(() => { toast.className = 'toast'; }, 2800);
+}
+function overlap(aStart, aEnd, bStart, bEnd){ return (aStart < bEnd) && (aEnd > bStart); }
+function labelOf(room){ return ROOM_LABELS[room] || room; }
+
+// —— 时间输入交互优化：**仅在分钟变化后**自动收起 ——
+function autoHideTimePickerFor(id){
+  const el = document.getElementById(id);
+  if(!el || el.dataset.boundMinuteHide) return; // 防重复绑定
+  el.dataset.boundMinuteHide = '1';
+  let initialized = false; // 第一次获得有效时间不触发隐藏（通常是先选小时）
+  let lastMinute = '';
+  const handler = () => {
+    const v = el.value;
+    if(/^\d{2}:\d{2}$/.test(v)){
+      const m = v.slice(3,5);
+      if(!initialized){ initialized = true; lastMinute = m; return; }
+      if(m !== lastMinute){ el.blur(); }
+      lastMinute = m;
     }
+  };
+  el.addEventListener('input', handler);
+  el.addEventListener('change', handler);
+}
+autoHideTimePickerFor('time');
+autoHideTimePickerFor('endTime');
+// 编辑弹窗里的（每次打开只会绑定一次）
+function wireEditTimeAutoHide(){
+  autoHideTimePickerFor('editTime');
+  autoHideTimePickerFor('editEndTime');
+}
 
-    // 删除预约
-    window.deleteReservation = function(idx) {
-      reservations.splice(idx, 1);
-      localStorage.setItem("reservations", JSON.stringify(reservations));
-      renderLists();
-    }
+// —— 监听数据库并渲染 ——
+const tbody = document.querySelector('#bookingsTable tbody');
+const bookingsCache = {}; // id -> data
 
-    renderLists();
+function upsertRow(id, data){
+  const trExisting = document.getElementById(id);
+  const cls = data.status === '待审核' ? 'pending' : '';
+  const actions = isAdmin
+    ? [
+        data.status === '待审核' ? `<button onclick=\"approveBooking('${id}')\">通过</button>` : '',
+        `<button onclick=\"openEdit('${id}')\">调整时间</button>`,
+        `<button class=\"btn-danger\" onclick=\"deleteBooking('${id}')\">删除</button>`
+      ].filter(Boolean).join(' ')
+    : '';
+  const html = `<td>${data.name||''}</td>
+                <td>${labelOf(data.room)}</td>
+                <td>${data.date||''}</td>
+                <td>${data.time||''}</td>
+                <td>${data.endTime||''}</td>
+                <td>${data.status === '待审核' ? '<span class=\"tag tag-pending\">待审核</span>' : '<span class=\"tag tag-ok\">已确认</span>'}</td>
+                <td class=\"admin-controls\">${actions}</td>`;
+  if(trExisting){ trExisting.className = cls; trExisting.innerHTML = html; }
+  else { const tr = document.createElement('tr'); tr.id = id; tr.className = cls; tr.innerHTML = html; tbody.appendChild(tr);}  
+}
 
-    // 创建预约
-    document.getElementById("createBtn").addEventListener("click", () => {
-      const name = document.getElementById("userName").value.trim();
-      const contact = document.getElementById("contact").value.trim();
-      const topic = document.getElementById("meetingTopic").value.trim();
-      const time = `${yearSel.value}-${monthSel.value}-${daySel.value} ${hourSel.value}:${minuteSel.value}`;
+function rerenderAll(){
+  tbody.innerHTML = '';
+  Object.keys(bookingsCache).sort((a,b)=>{
+    const A = bookingsCache[a], B = bookingsCache[b];
+    const kA = `${A.date||''} ${A.time||''}`; const kB = `${B.date||''} ${B.time||''}`;
+    return kA.localeCompare(kB);
+  }).forEach(id=> upsertRow(id, bookingsCache[id]));
+}
 
-      if (!name || !contact || !topic) {
-        alert("请填写完整信息！");
-        return;
-      }
+function attachRealtime(){
+  const ref = db.ref('bookings');
+  ref.on('value', (snapshot)=>{
+    for(const k in bookingsCache) delete bookingsCache[k];
+    snapshot.forEach(child=>{ bookingsCache[child.key] = child.val(); });
+    rerenderAll();
+  }, (error)=>{
+    console.error(error);
+    showToast('数据库读取失败：'+ (error && (error.code||error.message) || '未知错误'));
+  });
+}
+attachRealtime();
 
-      reservations.push({ name, contact, topic, time });
-      localStorage.setItem("reservations", JSON.stringify(reservations));
-      renderLists();
+// —— 业务：新增预约 ——
+async function addBooking() {
+  const name = document.getElementById('name').value.trim();
+  const room = document.getElementById('room').value;
+  const date = document.getElementById('date').value;
+  const startTime = document.getElementById('time').value;
+  const endTime = document.getElementById('endTime').value;
+  if (!name || !date || !startTime || !endTime || !room) return showToast('请填写完整信息');
+  if (endTime <= startTime) return showToast('结束时间必须晚于开始时间');
+
+  try{
+    const snap = await db.ref('bookings').orderByChild('date').equalTo(date).once('value');
+    let conflict = false;
+    snap.forEach(child=>{
+      const b = child.val();
+      if (b.room === room && overlap(startTime, endTime, b.time, b.endTime)) conflict = true;
     });
+    if (conflict) return showToast('该会议室该时间段已有预约，请更换时间或房间');
 
-    // 管理员模式
-    adminToggle.addEventListener("click", () => {
-      if (adminEmailInput.value === "xwjiang@whut.edu.cn" && adminPasswordInput.value === "admin123") {
-        adminSection.classList.toggle("hidden");
-      } else {
-        alert("管理员账号或密码错误！");
-      }
-    });
+    const status = (room === '304C' && !isAdmin) ? '待审核' : '已确认';
+    await db.ref('bookings').push({ name, room, date, time:startTime, endTime, status });
+    showToast('预约提交成功' + (status === '待审核' ? '，等待管理员审核' : ''));
 
-    // 分钟选择后隐藏时间选择框
-    minuteSel.addEventListener("change", () => {
-      yearSel.classList.add("hidden");
-      monthSel.classList.add("hidden");
-      daySel.classList.add("hidden");
-      hourSel.classList.add("hidden");
-      minuteSel.classList.add("hidden");
+    // 清空 & 收起输入框
+    document.getElementById('name').value='';
+    document.getElementById('room').selectedIndex=0;
+    document.getElementById('date').value='';
+    ['time','endTime'].forEach(id=>{ const el=document.getElementById(id); el.value=''; el.blur(); });
+  }catch(err){
+    console.error(err);
+    showToast('提交失败：'+ (err.code || err.message || '未知错误'));
+  }
+}
+
+// —— 管理：审核、编辑、删除 ——
+function approveBooking(id){ if(!isAdmin) return; db.ref('bookings/'+id).update({status:'已确认'}).catch(err=> showToast('操作失败：'+(err.code||err.message))); }
+function deleteBooking(id){ if(!isAdmin) return; if(confirm('确认删除该预约？')) db.ref('bookings/'+id).remove().catch(err=> showToast('删除失败：'+(err.code||err.message))); }
+
+function openEdit(id){
+  if(!isAdmin) return;
+  currentEditId = id;
+  const b = bookingsCache[id];
+  if(!b) return;
+  document.getElementById('editDate').value = b.date || '';
+  document.getElementById('editTime').value = b.time || '';
+  document.getElementById('editEndTime').value = b.endTime || '';
+  document.getElementById('editBackdrop').style.display = 'flex';
+  wireEditTimeAutoHide();
+}
+function closeModal(){ currentEditId=null; document.getElementById('editBackdrop').style.display='none'; }
+function saveEdit(){
+  if(!isAdmin || !currentEditId) return;
+  const date = document.getElementById('editDate').value;
+  const startTime = document.getElementById('editTime').value;
+  const endTime = document.getElementById('editEndTime').value;
+  const b = bookingsCache[currentEditId];
+  if(!b) return closeModal();
+  if (!date || !startTime || !endTime) return showToast('请完整填写时间');
+  if (endTime <= startTime) return showToast('结束时间必须晚于开始时间');
+
+  db.ref('bookings').orderByChild('date').equalTo(date).once('value').then(snapshot => {
+    let conflict = false;
+    snapshot.forEach(child => {
+      const id = child.key; const x = child.val();
+      if(id === currentEditId) return; // 自己不比对
+      if (x.room === b.room && overlap(startTime, endTime, x.time, x.endTime)) conflict = true;
     });
-  </script>
+    if (conflict) return showToast('该会议室该时间段已有预约');
+
+    db.ref('bookings/'+currentEditId).update({ date, time:startTime, endTime }).then(()=>{
+      showToast('已更新预约时间'); closeModal();
+    }).catch(err=> showToast('保存失败：'+(err.code||err.message)));
+  }).catch(err=> showToast('校验失败：'+(err.code||err.message)));
+}
+
+// —— 管理员模式切换 ——
+function toggleAdmin(){
+  const email = document.getElementById('adminEmail').value.trim();
+  const pwd = document.getElementById('adminPass').value;
+  if(email === 'xwjiang@whut.edu.cn' && pwd === 'admin123'){
+    isAdmin = !isAdmin;
+    document.getElementById('adminStatus').textContent = '当前身份：' + (isAdmin? '管理员' : '普通用户');
+    showToast(isAdmin? '已进入管理员模式' : '已退出管理员模式');
+    rerenderAll(); // 切换后刷新操作列
+  }else{
+    isAdmin = false;
+    document.getElementById('adminStatus').textContent = '当前身份：普通用户';
+    showToast('管理员邮箱或密码错误');
+    rerenderAll();
+  }
+}
+
+// —— 绑定按钮 ——
+window.addEventListener('DOMContentLoaded', ()=>{
+  const createBtn = document.getElementById('createBtn');
+  if(createBtn) createBtn.addEventListener('click', addBooking);
+  const toggleBtn = document.getElementById('toggleAdminBtn');
+  if(toggleBtn) toggleBtn.addEventListener('click', toggleAdmin);
+});
+</script>
 </body>
 </html>

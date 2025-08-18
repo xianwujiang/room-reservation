@@ -143,17 +143,31 @@ function showToast(msg) {
 function overlap(aStart, aEnd, bStart, bEnd){ return (aStart < bEnd) && (aEnd > bStart); }
 function labelOf(room){ return ROOM_LABELS[room] || room; }
 
-// —— 时间输入交互优化：选定分钟后自动收起 ——
+// —— 时间输入交互优化：**仅在分钟变化后**自动收起 ——
 function autoHideTimePickerFor(id){
   const el = document.getElementById(id);
-  if(!el) return;
-  const maybeBlur = () => { if(/^\d{2}:\d{2}$/.test(el.value)) el.blur(); };
-  el.addEventListener('change', maybeBlur);
-  el.addEventListener('input', maybeBlur);
+  if(!el || el.dataset.boundMinuteHide) return; // 防重复绑定
+  el.dataset.boundMinuteHide = '1';
+  let initialized = false; // 第一次获得有效时间不触发隐藏（通常是先选小时）
+  let lastMinute = '';
+  const handler = () => {
+    const v = el.value;
+    if(/^\d{2}:\d{2}$/.test(v)){
+      const m = v.slice(3,5);
+      if(!initialized){ initialized = true; lastMinute = m; return; }
+      if(m !== lastMinute){ el.blur(); }
+      lastMinute = m;
+    }
+  };
+  el.addEventListener('input', handler);
+  el.addEventListener('change', handler);
 }
-['time','endTime'].forEach(autoHideTimePickerFor);
+autoHideTimePickerFor('time');
+autoHideTimePickerFor('endTime');
+// 编辑弹窗里的（每次打开只会绑定一次）
 function wireEditTimeAutoHide(){
-  ['editTime','editEndTime'].forEach(autoHideTimePickerFor);
+  autoHideTimePickerFor('editTime');
+  autoHideTimePickerFor('editEndTime');
 }
 
 // —— 监听数据库并渲染 ——
@@ -192,15 +206,13 @@ function rerenderAll(){
 
 function attachRealtime(){
   const ref = db.ref('bookings');
-  // 用 value 事件一次性拿全量，并在后续变化时统一刷新；并增加错误处理提示权限问题
   ref.on('value', (snapshot)=>{
-    // 清空缓存并重建
     for(const k in bookingsCache) delete bookingsCache[k];
     snapshot.forEach(child=>{ bookingsCache[child.key] = child.val(); });
     rerenderAll();
   }, (error)=>{
     console.error(error);
-    showToast('数据库读取失败：'+ (error && (error.code||error.message) || '未知错误') + '。请检查 Realtime Database 是否已启用且规则允许读取。');
+    showToast('数据库读取失败：'+ (error && (error.code||error.message) || '未知错误'));
   });
 }
 attachRealtime();
@@ -232,10 +244,10 @@ async function addBooking() {
     document.getElementById('name').value='';
     document.getElementById('room').selectedIndex=0;
     document.getElementById('date').value='';
-    ['time','endTime'].forEach(id=>{ document.getElementById(id).value=''; document.getElementById(id).blur(); });
+    ['time','endTime'].forEach(id=>{ const el=document.getElementById(id); el.value=''; el.blur(); });
   }catch(err){
     console.error(err);
-    showToast('提交失败：'+ (err.code || err.message || '未知错误') + '。如为权限问题，请在数据库规则中允许写入。');
+    showToast('提交失败：'+ (err.code || err.message || '未知错误'));
   }
 }
 
@@ -265,7 +277,6 @@ function saveEdit(){
   if (!date || !startTime || !endTime) return showToast('请完整填写时间');
   if (endTime <= startTime) return showToast('结束时间必须晚于开始时间');
 
-  // 冲突检测（排除自己）
   db.ref('bookings').orderByChild('date').equalTo(date).once('value').then(snapshot => {
     let conflict = false;
     snapshot.forEach(child => {
@@ -298,7 +309,7 @@ function toggleAdmin(){
   }
 }
 
-// —— 绑定按钮（避免某些环境下内联 onclick 被 CSP 拦截） ——
+// —— 绑定按钮 ——
 window.addEventListener('DOMContentLoaded', ()=>{
   const createBtn = document.getElementById('createBtn');
   if(createBtn) createBtn.addEventListener('click', addBooking);

@@ -46,6 +46,7 @@
         <div class="card">
             <h3>新建预约</h3>
             <input type="text" id="name" placeholder="姓名">
+            <input type="text" id="phone" placeholder="联系电话">
             <select id="room">
                 <option value="304P">物理楼304</option>
                 <option value="307P">物理楼307</option>
@@ -75,7 +76,7 @@
             <h3>预约列表</h3>
             <table id="bookingsTable">
                 <thead>
-                    <tr><th>姓名</th><th>会议室</th><th>日期</th><th>开始时间</th><th>结束时间</th><th>状态</th><th>操作</th></tr>
+                    <tr><th>姓名</th><th>联系电话</th><th>会议室</th><th>日期</th><th>开始时间</th><th>结束时间</th><th>状态</th><th>操作</th></tr>
                 </thead>
                 <tbody></tbody>
             </table>
@@ -123,7 +124,8 @@ AV.init({
   serverURLs: 'https://5iaoq4hi.lc-cn-n1-shared.com'
 });
 
-// 后续的 JS 逻辑保持你上次的那一版（已完成迁移到 LeanCloud 的版本）...
+// 在 addBooking 保存时增加 phone 字段
+// 在 upsertRow 渲染时增加 phone 列
 </script>
 </body>
 </html>

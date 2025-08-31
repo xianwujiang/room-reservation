@@ -5,7 +5,9 @@
     <title>物理与力学学院会议室预约系统（美观界面版）</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-        :root{ --brand:#4CAF50;--brand-dark:#3c9442;--danger:#e5534b;--muted:#6b7280;--bg:#f0f2f5;--card:#fff }
+        :root{
+          --brand:#4CAF50;--brand-dark:#3c9442;--danger:#e5534b;--muted:#6b7280;--bg:#f0f2f5;--card:#fff
+        }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; background: var(--bg); }
         h2 { text-align: center; margin: 20px 0; color: #333; }
         .container { display: flex; flex-wrap: wrap; max-width: 1200px; margin: 0 auto; padding: 20px; gap: 12px; }
@@ -61,7 +63,7 @@
                 <input type="time" id="endTime" placeholder="结束时间">
               </div>
             </div>
-            <button id="createBtn" onclick="addBooking()">创建预约</button>
+            <button id="createBtn">创建预约</button>
         </div>
         <div class="card">
             <h3>管理员登录</h3>
@@ -141,22 +143,14 @@ function autoHideTimePickerFor(id){
   const el = document.getElementById(id);
   if(!el || el.dataset.boundMinuteHide) return; // 防重复绑定
   el.dataset.boundMinuteHide = '1';
-  let lastMinute = null; // 记录上一次的“分钟”；只在分钟变化时才收起
-
-  // 获取初始分钟（在获得焦点时记录，避免第一次只改小时就触发）
-  el.addEventListener('focus', () => {
-    const v = el.value;
-    lastMinute = /^\d{2}:\d{2}$/.test(v) ? v.slice(3,5) : null;
-  });
-
+  let initialized = false; // 第一次获得有效时间不触发隐藏（通常是先选小时）
+  let lastMinute = '';
   const handler = () => {
     const v = el.value;
-    if(!/^\d{2}:\d{2}$/.test(v)) return;
-    const m = v.slice(3,5);
-    if(lastMinute === null){ lastMinute = m; return; }
-    if(m !== lastMinute){
-      // 只在“分钟变了”时自动收起
-      setTimeout(()=>{ el.blur(); }, 0);
+    if(/^\d{2}:\d{2}$/.test(v)){
+      const m = v.slice(3,5);
+      if(!initialized){ initialized = true; lastMinute = m; return; }
+      if(m !== lastMinute){ el.blur(); }
       lastMinute = m;
     }
   };
@@ -177,9 +171,9 @@ function upsertRow(id, data){
   const cls = data.status === '待审核' ? 'pending' : '';
   const actions = isAdmin
     ? [
-        data.status === '待审核' ? `<button onclick="approveBooking('${id}')">通过</button>` : '',
-        `<button onclick="openEdit('${id}')">调整时间</button>`,
-        `<button class="btn-danger" onclick="deleteBooking('${id}')">删除</button>`
+        data.status === '待审核' ? `<button onclick=\"approveBooking('${id}')\">通过</button>` : '',
+        `<button onclick=\"openEdit('${id}')\">调整时间</button>`,
+        `<button class=\"btn-danger\" onclick=\"deleteBooking('${id}')\">删除</button>`
       ].filter(Boolean).join(' ')
     : '';
   const html = `<td>${data.name||''}</td>
@@ -230,7 +224,7 @@ async function initialLoadAndWatch(){
   }
 }
 
-// —— 业务：新增预约（含“乐观更新”本地立即显示） ——
+// —— 业务：新增预约 ——
 async function addBooking() {
   const name = document.getElementById('name').value.trim();
   const phoneEl = document.getElementById('phone');
@@ -259,13 +253,6 @@ async function addBooking() {
     booking.set({ name, phone, room, date, time: startTime, endTime, status });
     await booking.save();
 
-    // —— 立刻本地更新（无需等待 LiveQuery 推送）——
-    try {
-      const saved = booking; // 保存后已有 id 与属性
-      bookingsCache[saved.id] = saved.toJSON ? saved.toJSON() : { name, phone, room, date, time: startTime, endTime, status };
-      upsertRow(saved.id, bookingsCache[saved.id]);
-    } catch (_) { /* 忽略本地渲染异常，LiveQuery 仍会补齐 */ }
-
     showToast('预约提交成功' + (status === '待审核' ? '，等待管理员审核' : ''));
     // 清空 & 收起输入框
     document.getElementById('name').value='';
@@ -278,23 +265,10 @@ async function addBooking() {
     showToast('提交失败：'+ (err.message || err));
   }
 }
-// —— 关键：立即将函数暴露到全局，确保内联 onclick 可调用 ——
-window.addBooking = addBooking;
 
 // —— 管理：审核、编辑、删除 ——
 function approveBooking(id){ if(!isAdmin) return; const b = AV.Object.createWithoutData('Booking', id); b.set('status','已确认'); b.save().catch(err=> showToast('操作失败：'+(err.message||err))); }
-function deleteBooking(id){
-  if(!isAdmin) return;
-  if(confirm('确认删除该预约？')){
-    const obj = AV.Object.createWithoutData('Booking', id);
-    obj.destroy().then(()=>{
-      // 本地立即移除，避免依赖 LiveQuery
-      delete bookingsCache[id];
-      const tr = document.getElementById(id); if(tr) tr.remove();
-      showToast('已删除预约');
-    }).catch(err=> showToast('删除失败：'+(err.message||err)));
-  }
-}
+function deleteBooking(id){ if(!isAdmin) return; if(confirm('确认删除该预约？')) AV.Object.createWithoutData('Booking', id).destroy().catch(err=> showToast('删除失败：'+(err.message||err))); }
 
 function openEdit(id){
   if(!isAdmin) return;
@@ -331,21 +305,6 @@ function saveEdit(){
 
     const obj = AV.Object.createWithoutData('Booking', currentEditId);
     obj.set({ date, time:startTime, endTime });
-    return obj.save().then(()=>{
-      // 本地立即更新缓存和表格
-      const local = bookingsCache[currentEditId] || {};
-      local.date = date; local.time = startTime; local.endTime = endTime;
-      bookingsCache[currentEditId] = local;
-      upsertRow(currentEditId, local);
-      showToast('已更新预约时间');
-      closeModal();
-    });
-  }).catch(err=> showToast('保存失败：'+(err.message||err)));
-});
-    if (conflict) return showToast('该会议室该时间段已有预约');
-
-    const obj = AV.Object.createWithoutData('Booking', currentEditId);
-    obj.set({ date, time:startTime, endTime });
     return obj.save().then(()=>{ showToast('已更新预约时间'); closeModal(); });
   }).catch(err=> showToast('保存失败：'+(err.message||err)));
 }
@@ -368,39 +327,14 @@ function toggleAdmin(){
 }
 
 // —— 绑定按钮 ——
-function safeBind(){
+window.addEventListener('DOMContentLoaded', ()=>{
   const createBtn = document.getElementById('createBtn');
-  if(createBtn){
-    createBtn.onclick = addBooking;
-    createBtn.addEventListener('click', addBooking);
-    // 兼容移动端（部分 WebView 对 click 延迟或丢失）：
-    const touchHandler = (e)=>{ e.preventDefault(); addBooking(); };
-    createBtn.addEventListener('touchend', touchHandler, {passive:false});
-    createBtn.addEventListener('pointerup', touchHandler);
-  }
+  if(createBtn) createBtn.addEventListener('click', addBooking);
   const toggleBtn = document.getElementById('toggleAdminBtn');
-  if(toggleBtn){
-    toggleBtn.onclick = toggleAdmin;
-    toggleBtn.addEventListener('click', toggleAdmin);
-  }
-}
-if(document.readyState === 'loading'){
-  window.addEventListener('DOMContentLoaded', ()=>{ safeBind(); initialLoadAndWatch(); });
-}else{
-  safeBind();
+  if(toggleBtn) toggleBtn.addEventListener('click', toggleAdmin);
+  // 初次加载与订阅
   initialLoadAndWatch();
-  // —— 导出到 window，确保内联 onclick 可用（修复 addBooking 未定义） ——
-  window.addBooking = addBooking;
-  window.toggleAdmin = toggleAdmin;
-  window.approveBooking = approveBooking;
-  window.deleteBooking = deleteBooking;
-  window.openEdit = openEdit;
 });
-}else{
-  // 若脚本被异步插入且 DOM 已就绪
-  safeBind();
-  initialLoadAndWatch();
-}
 </script>
 </body>
 </html>

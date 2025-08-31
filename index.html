@@ -5,9 +5,7 @@
     <title>物理与力学学院会议室预约系统（美观界面版）</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-        :root{
-          --brand:#4CAF50;--brand-dark:#3c9442;--danger:#e5534b;--muted:#6b7280;--bg:#f0f2f5;--card:#fff
-        }
+        :root{ --brand:#4CAF50;--brand-dark:#3c9442;--danger:#e5534b;--muted:#6b7280;--bg:#f0f2f5;--card:#fff }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; background: var(--bg); }
         h2 { text-align: center; margin: 20px 0; color: #333; }
         .container { display: flex; flex-wrap: wrap; max-width: 1200px; margin: 0 auto; padding: 20px; gap: 12px; }
@@ -143,14 +141,22 @@ function autoHideTimePickerFor(id){
   const el = document.getElementById(id);
   if(!el || el.dataset.boundMinuteHide) return; // 防重复绑定
   el.dataset.boundMinuteHide = '1';
-  let initialized = false; // 第一次获得有效时间不触发隐藏（通常是先选小时）
-  let lastMinute = '';
+  let lastMinute = null; // 记录上一次的“分钟”；只在分钟变化时才收起
+
+  // 获取初始分钟（在获得焦点时记录，避免第一次只改小时就触发）
+  el.addEventListener('focus', () => {
+    const v = el.value;
+    lastMinute = /^\d{2}:\d{2}$/.test(v) ? v.slice(3,5) : null;
+  });
+
   const handler = () => {
     const v = el.value;
-    if(/^\d{2}:\d{2}$/.test(v)){
-      const m = v.slice(3,5);
-      if(!initialized){ initialized = true; lastMinute = m; return; }
-      if(m !== lastMinute){ el.blur(); }
+    if(!/^\d{2}:\d{2}$/.test(v)) return;
+    const m = v.slice(3,5);
+    if(lastMinute === null){ lastMinute = m; return; }
+    if(m !== lastMinute){
+      // 只在“分钟变了”时自动收起
+      setTimeout(()=>{ el.blur(); }, 0);
       lastMinute = m;
     }
   };
@@ -224,7 +230,7 @@ async function initialLoadAndWatch(){
   }
 }
 
-// —— 业务：新增预约 ——
+// —— 业务：新增预约（含“乐观更新”本地立即显示） ——
 async function addBooking() {
   const name = document.getElementById('name').value.trim();
   const phoneEl = document.getElementById('phone');
@@ -252,6 +258,13 @@ async function addBooking() {
     const booking = new AV.Object('Booking');
     booking.set({ name, phone, room, date, time: startTime, endTime, status });
     await booking.save();
+
+    // —— 立刻本地更新（无需等待 LiveQuery 推送）——
+    try {
+      const saved = booking; // 保存后已有 id 与属性
+      bookingsCache[saved.id] = saved.toJSON ? saved.toJSON() : { name, phone, room, date, time: startTime, endTime, status };
+      upsertRow(saved.id, bookingsCache[saved.id]);
+    } catch (_) { /* 忽略本地渲染异常，LiveQuery 仍会补齐 */ }
 
     showToast('预约提交成功' + (status === '待审核' ? '，等待管理员审核' : ''));
     // 清空 & 收起输入框

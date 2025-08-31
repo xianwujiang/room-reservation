@@ -281,7 +281,18 @@ async function addBooking() {
 
 // —— 管理：审核、编辑、删除 ——
 function approveBooking(id){ if(!isAdmin) return; const b = AV.Object.createWithoutData('Booking', id); b.set('status','已确认'); b.save().catch(err=> showToast('操作失败：'+(err.message||err))); }
-function deleteBooking(id){ if(!isAdmin) return; if(confirm('确认删除该预约？')) AV.Object.createWithoutData('Booking', id).destroy().catch(err=> showToast('删除失败：'+(err.message||err))); }
+function deleteBooking(id){
+  if(!isAdmin) return;
+  if(confirm('确认删除该预约？')){
+    const obj = AV.Object.createWithoutData('Booking', id);
+    obj.destroy().then(()=>{
+      // —— 本地立即移除（无需等 LiveQuery）——
+      delete bookingsCache[id];
+      const tr = document.getElementById(id); if(tr) tr.remove();
+      showToast('已删除预约');
+    }).catch(err=> showToast('删除失败：'+(err.message||err)));
+  }
+}
 
 function openEdit(id){
   if(!isAdmin) return;
@@ -314,6 +325,21 @@ function saveEdit(){
       const x = row.toJSON();
       return overlap(startTime, endTime, x.time, x.endTime);
     });
+    if (conflict) return showToast('该会议室该时间段已有预约');
+
+    const obj = AV.Object.createWithoutData('Booking', currentEditId);
+    obj.set({ date, time:startTime, endTime });
+    return obj.save().then(()=>{
+      // —— 本地立即更新（无需等 LiveQuery）——
+      const local = bookingsCache[currentEditId] || {};
+      local.date = date; local.time = startTime; local.endTime = endTime;
+      bookingsCache[currentEditId] = local;
+      upsertRow(currentEditId, local);
+      showToast('已更新预约时间');
+      closeModal();
+    });
+  }).catch(err=> showToast('保存失败：'+(err.message||err)));
+});
     if (conflict) return showToast('该会议室该时间段已有预约');
 
     const obj = AV.Object.createWithoutData('Booking', currentEditId);

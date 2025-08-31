@@ -61,7 +61,7 @@
                 <input type="time" id="endTime" placeholder="结束时间">
               </div>
             </div>
-            <button id="createBtn">创建预约</button>
+            <button id="createBtn" onclick="addBooking()">创建预约</button>
         </div>
         <div class="card">
             <h3>管理员登录</h3>
@@ -369,9 +369,12 @@ function toggleAdmin(){
 function safeBind(){
   const createBtn = document.getElementById('createBtn');
   if(createBtn){
-    // 双保险：同时赋值 onclick 与 addEventListener，避免某些环境下事件未绑定
     createBtn.onclick = addBooking;
     createBtn.addEventListener('click', addBooking);
+    // 兼容移动端（部分 WebView 对 click 延迟或丢失）：
+    const touchHandler = (e)=>{ e.preventDefault(); addBooking(); };
+    createBtn.addEventListener('touchend', touchHandler, {passive:false});
+    createBtn.addEventListener('pointerup', touchHandler);
   }
   const toggleBtn = document.getElementById('toggleAdminBtn');
   if(toggleBtn){
@@ -381,6 +384,10 @@ function safeBind(){
 }
 if(document.readyState === 'loading'){
   window.addEventListener('DOMContentLoaded', ()=>{ safeBind(); initialLoadAndWatch(); });
+}else{
+  safeBind();
+  initialLoadAndWatch();
+});
 }else{
   // 若脚本被异步插入且 DOM 已就绪
   safeBind();

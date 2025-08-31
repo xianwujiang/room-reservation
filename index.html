@@ -278,6 +278,8 @@ async function addBooking() {
     showToast('提交失败：'+ (err.message || err));
   }
 }
+// —— 关键：立即将函数暴露到全局，确保内联 onclick 可调用 ——
+window.addBooking = addBooking;
 
 // —— 管理：审核、编辑、删除 ——
 function approveBooking(id){ if(!isAdmin) return; const b = AV.Object.createWithoutData('Booking', id); b.set('status','已确认'); b.save().catch(err=> showToast('操作失败：'+(err.message||err))); }

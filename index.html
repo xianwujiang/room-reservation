@@ -177,9 +177,9 @@ function upsertRow(id, data){
   const cls = data.status === '待审核' ? 'pending' : '';
   const actions = isAdmin
     ? [
-        data.status === '待审核' ? `<button onclick=\"approveBooking('${id}')\">通过</button>` : '',
-        `<button onclick=\"openEdit('${id}')\">调整时间</button>`,
-        `<button class=\"btn-danger\" onclick=\"deleteBooking('${id}')\">删除</button>`
+        data.status === '待审核' ? `<button onclick="approveBooking('${id}')">通过</button>` : '',
+        `<button onclick="openEdit('${id}')">调整时间</button>`,
+        `<button class="btn-danger" onclick="deleteBooking('${id}')">删除</button>`
       ].filter(Boolean).join(' ')
     : '';
   const html = `<td>${data.name||''}</td>
@@ -387,6 +387,12 @@ if(document.readyState === 'loading'){
 }else{
   safeBind();
   initialLoadAndWatch();
+  // —— 导出到 window，确保内联 onclick 可用（修复 addBooking 未定义） ——
+  window.addBooking = addBooking;
+  window.toggleAdmin = toggleAdmin;
+  window.approveBooking = approveBooking;
+  window.deleteBooking = deleteBooking;
+  window.openEdit = openEdit;
 });
 }else{
   // 若脚本被异步插入且 DOM 已就绪

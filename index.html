@@ -366,14 +366,26 @@ function toggleAdmin(){
 }
 
 // —— 绑定按钮 ——
-window.addEventListener('DOMContentLoaded', ()=>{
+function safeBind(){
   const createBtn = document.getElementById('createBtn');
-  if(createBtn) createBtn.addEventListener('click', addBooking);
+  if(createBtn){
+    // 双保险：同时赋值 onclick 与 addEventListener，避免某些环境下事件未绑定
+    createBtn.onclick = addBooking;
+    createBtn.addEventListener('click', addBooking);
+  }
   const toggleBtn = document.getElementById('toggleAdminBtn');
-  if(toggleBtn) toggleBtn.addEventListener('click', toggleAdmin);
-  // 初次加载与订阅
+  if(toggleBtn){
+    toggleBtn.onclick = toggleAdmin;
+    toggleBtn.addEventListener('click', toggleAdmin);
+  }
+}
+if(document.readyState === 'loading'){
+  window.addEventListener('DOMContentLoaded', ()=>{ safeBind(); initialLoadAndWatch(); });
+}else{
+  // 若脚本被异步插入且 DOM 已就绪
+  safeBind();
   initialLoadAndWatch();
-});
+}
 </script>
 </body>
 </html>

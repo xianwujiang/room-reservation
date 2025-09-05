@@ -112,7 +112,7 @@
 <div id="toast" class="toast"></div>
 
 <!-- LeanCloud JS SDK（国内可直连） -->
-<script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.2/dist/av-min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.2/dist/av-live-query-min.js"></script>
 
 <script>
 // ========== LeanCloud 初始化 ==========
@@ -258,6 +258,13 @@ async function addBooking() {
     const booking = new AV.Object('Booking');
     booking.set({ name, phone, room, date, time: startTime, endTime, status });
     await booking.save();
+
+    // —— 本地乐观更新：保存成功立即插入一行 ——
+    try {
+      const saved = booking;
+      bookingsCache[saved.id] = saved.toJSON ? saved.toJSON() : { name, phone, room, date, time: startTime, endTime, status };
+      upsertRow(saved.id, bookingsCache[saved.id]);
+    } catch(_) { /* 即使失败，LiveQuery 也会补齐 */ }
 
     // 保持与后端一致的显示（依赖 LiveQuery 或刷新后首次加载）；
     // 如果你希望“立即本地显示”，我可以只加 3 行乐观更新，不改变其它逻辑。

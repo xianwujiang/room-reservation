@@ -62,6 +62,7 @@
               </div>
             </div>
             <button id="createBtn">创建预约</button>
+            <button id="repeatBtn" class="btn-plain">每周重复（16周）</button>
         </div>
         <div class="card">
             <h3>管理员登录</h3>
@@ -266,9 +267,6 @@ async function addBooking() {
       upsertRow(saved.id, bookingsCache[saved.id]);
     } catch(_) { /* 即使失败，LiveQuery 也会补齐 */ }
 
-    // 保持与后端一致的显示（依赖 LiveQuery 或刷新后首次加载）；
-    // 如果你希望“立即本地显示”，我可以只加 3 行乐观更新，不改变其它逻辑。
-
     showToast('预约提交成功' + (status === '待审核' ? '，等待管理员审核' : ''));
     // 清空 & 收起输入框
     document.getElementById('name').value='';
@@ -280,6 +278,56 @@ async function addBooking() {
     console.error(err);
     showToast('提交失败：'+ (err.message || err));
   }
+}
+
+// —— 扩展：每周重复（16周），其余逻辑完全保持不变 ——
+function addDaysStr(dateStr, days){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  dt.setDate(dt.getDate()+days);
+  const mm = String(dt.getMonth()+1).padStart(2,'0');
+  const dd = String(dt.getDate()).padStart(2,'0');
+  return `${dt.getFullYear()}-${mm}-${dd}`;
+}
+
+async function addRecurring16Weeks(){
+  const name = document.getElementById('name').value.trim();
+  const phoneEl = document.getElementById('phone');
+  const phone = phoneEl ? phoneEl.value.trim() : '';
+  const room = document.getElementById('room').value;
+  const date = document.getElementById('date').value;
+  const startTime = document.getElementById('time').value;
+  const endTime = document.getElementById('endTime').value;
+  if (!name || !date || !startTime || !endTime || !room || (phoneEl && !phone)) return showToast('请填写完整信息' + (phoneEl?'（含联系电话）':''));
+  if (endTime <= startTime) return showToast('结束时间必须晚于开始时间');
+
+  let ok = 0, fail = [];
+  for(let i=0;i<16;i++){
+    const di = addDaysStr(date, 7*i);
+    try{
+      // 冲突检测（同日同房间）
+      const q = new AV.Query('Booking');
+      q.equalTo('date', di); q.equalTo('room', room);
+      const exists = await q.find();
+      const hasConflict = exists.some(b=>{ const x=b.toJSON(); return overlap(startTime, endTime, x.time, x.endTime); });
+      if(hasConflict){ fail.push(di); continue; }
+
+      const status = (room === '304C' && !isAdmin) ? '待审核' : '已确认';
+      const booking = new AV.Object('Booking');
+      booking.set({ name, phone, room, date: di, time: startTime, endTime, status });
+      await booking.save();
+
+      // 乐观更新每一条
+      try{
+        const saved = booking;
+        bookingsCache[saved.id] = saved.toJSON ? saved.toJSON() : { name, phone, room, date:di, time:startTime, endTime, status };
+        upsertRow(saved.id, bookingsCache[saved.id]);
+      }catch(_){ }
+      ok++;
+    }catch(e){ fail.push(di); }
+  }
+  if(ok>0) showToast(`已创建 ${ok} 次重复预约${fail.length?`（冲突跳过 ${fail.length} 次）`:''}`);
+  if(fail.length && ok===0) showToast('重复预约均冲突，未创建');
 }
 
 // —— 管理：审核、编辑、删除 ——
